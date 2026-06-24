@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Work Planner Pro</title>
+
+<link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#0078d4">
+
+<style>
+/* (same CSS as your last full version — unchanged for brevity) */
+
+*{box-sizing:border-box;}
+body{margin:0;padding:12px;font-family:Arial;background:#f5f5f5;}
+.container{max-width:650px;margin:auto;}
+h1{text-align:center;margin:0 0 10px;font-size:1.4rem;}
+.week-picker{width:100%;padding:10px;font-size:14px;}
+.day{display:grid;grid-template-columns:40px 80px 80px 55px 1fr;gap:4px;background:#fff;padding:6px;margin-bottom:4px;border-radius:6px;}
+.day-name{font-size:12px;font-weight:bold;}
+.day input{width:100%;padding:4px;font-size:13px;}
+.hours{text-align:right;font-weight:bold;}
+.total{margin-top:10px;background:#0078d4;color:#fff;padding:10px;border-radius:8px;}
+button{padding:10px;font-size:13px;margin:2px;}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Work Planner Pro</h1>
+
+<input type="week" id="weekPicker">
+
+<div id="daysContainer"></div>
+
+<div class="total">
+    Weekly Total: <span id="weeklyTotal">0.00</span> hrs
+</div>
+
+</div>
+
+<script>
+// --- YOUR EXISTING APP LOGIC GOES HERE ---
+// (use the full JS from previous message unchanged)
+</script>
+
+<script>
+/* =========================
+   PWA REGISTRATION
+========================= */
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+            .then(reg => console.log('SW registered'))
+            .catch(err => console.log('SW failed', err));
+    });
+}
+
+/* Optional install prompt */
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    // You could show a custom install button here if you want
+    console.log("Install prompt ready");
+});
+</script>
+
+</body>
+</html>
