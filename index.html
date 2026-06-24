@@ -3,74 +3,837 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Work Planner Pro</title>
-
-<link rel="manifest" href="manifest.json">
-
-<meta name="theme-color" content="#0078d4">
+<title>Work Hours Planner</title>
 
 <style>
-/* (same CSS as your last full version — unchanged for brevity) */
+*{
+    box-sizing:border-box;
+}
 
-*{box-sizing:border-box;}
-body{margin:0;padding:12px;font-family:Arial;background:#f5f5f5;}
-.container{max-width:650px;margin:auto;}
-h1{text-align:center;margin:0 0 10px;font-size:1.4rem;}
-.week-picker{width:100%;padding:10px;font-size:14px;}
-.day{display:grid;grid-template-columns:40px 80px 80px 55px 1fr;gap:4px;background:#fff;padding:6px;margin-bottom:4px;border-radius:6px;}
-.day-name{font-size:12px;font-weight:bold;}
-.day input{width:100%;padding:4px;font-size:13px;}
-.hours{text-align:right;font-weight:bold;}
-.total{margin-top:10px;background:#0078d4;color:#fff;padding:10px;border-radius:8px;}
-button{padding:10px;font-size:13px;margin:2px;}
+body{
+    margin:0;
+    padding:12px;
+    font-family:Arial,sans-serif;
+    background:#f5f5f5;
+}
+
+.container{
+    max-width:600px;
+    margin:auto;
+}
+
+h1{
+    text-align:center;
+    margin:0 0 12px;
+    font-size:1.5rem;
+}
+
+.week-picker{
+    flex:1 1 auto;
+    min-width:180px;
+    padding:10px;
+    font-size:16px;
+    margin-bottom:0;
+}
+
+.fill-button{
+    width:100%;
+    padding:10px;
+    font-size:16px;
+    margin-bottom:12px;
+    border:none;
+    border-radius:8px;
+    background:#555;
+    color:white;
+    cursor:pointer;
+}
+
+.fill-button:hover{
+    background:#444;
+}
+
+.top-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:12px;
+    position:relative;
+}
+
+.menu-button{
+    width:36px;
+    height:36px;
+    border:none;
+    background:transparent;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding:6px;
+}
+
+.menu-button span{
+    display:block;
+    height:3px;
+    border-radius:2px;
+    background:#333;
+}
+
+.menu-panel{
+    position:absolute;
+    top:calc(100% + 8px);
+    right:0;
+    width:220px;
+    background:white;
+    border:1px solid #ccc;
+    border-radius:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,.12);
+    padding:8px 0;
+    z-index:100;
+}
+
+.menu-panel.hidden{
+    display:none;
+}
+
+.menu-item{
+    width:100%;
+    background:transparent;
+    border:none;
+    text-align:left;
+    padding:10px 16px;
+    font-size:14px;
+    color:#333;
+    cursor:pointer;
+}
+
+.menu-item:hover{
+    background:#f2f2f2;
+}
+
+.week-controls{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+    background:transparent;
+    border:1px solid transparent;
+    padding:10px;
+    border-radius:12px;
+}
+
+.week-controls.current-week{
+    background:#eaf3ff;
+    border-color:#0078d4;
+}
+
+.nav-button{
+    padding:10px;
+    font-size:14px;
+    border:none;
+    border-radius:8px;
+    background:#444;
+    color:white;
+    cursor:pointer;
+}
+
+.nav-button:hover{
+    background:#333;
+}
+
+.header-row{
+    display:grid;
+    grid-template-columns:
+        40px
+        70px
+        70px
+        50px
+        1fr;
+    gap:4px;
+    padding:0 6px 6px;
+    font-size:12px;
+    font-weight:bold;
+    color:#666;
+}
+
+.day{
+    display:grid;
+    grid-template-columns:
+        40px
+        70px
+        70px
+        50px
+        1fr;
+
+    gap:4px;
+    align-items:center;
+
+    background:white;
+    padding:6px;
+    margin-bottom:4px;
+    border-radius:6px;
+    box-shadow:0 1px 3px rgba(0,0,0,.08);
+    cursor:pointer;
+}
+
+.day:hover{
+    background:#f5faff;
+}
+
+.day.has-note{
+    box-shadow:0 1px 3px rgba(0,0,0,.08), inset 0 0 0 2px rgba(10,124,67,.3);
+}
+
+.today-row{
+    background:#eef5ff;
+    box-shadow:0 0 0 2px rgba(0,120,212,.25);
+}
+
+.day-name{
+    font-size:13px;
+    font-weight:bold;
+}
+
+.day input{
+    width:100%;
+    padding:4px;
+    font-size:14px;
+}
+
+.day input[type="number"]{
+    text-align:center;
+}
+
+.hours{
+    text-align:right;
+    font-weight:bold;
+    white-space:nowrap;
+    font-size:14px;
+}
+
+.summary {
+    margin:12px 0 18px;
+    background:#d2691e;
+    color:white;
+    text-align:center;
+    padding:16px 18px;
+    border-radius:10px;
+    font-size:20px;
+    font-weight:bold;
+}
+
+.summary.met-target {
+    background:#0078d4;
+}
+
+.modal-overlay{
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    bottom:0;
+    background:rgba(0,0,0,0.45);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+    z-index:1000;
+}
+
+.modal-overlay.hidden{
+    display:none;
+}
+
+.modal{
+    width:100%;
+    max-width:460px;
+    background:white;
+    border-radius:12px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.15);
+    padding:20px;
+}
+
+.modal h2{
+    margin:0 0 12px;
+    font-size:1.2rem;
+}
+
+.modal textarea{
+    width:100%;
+    min-height:140px;
+    padding:10px;
+    border:1px solid #ccc;
+    border-radius:8px;
+    font-size:14px;
+    resize:vertical;
+}
+
+.modal-buttons{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:12px;
+}
+
+.modal button{
+    padding:10px 14px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:14px;
+}
+
+.modal button.save{
+    background:#0078d4;
+    color:white;
+}
+
+.modal button.cancel{
+    background:#e0e0e0;
+    color:#333;
+}
+
+@media (max-width:420px){
+
+    .header-row,
+    .day{
+        grid-template-columns:
+            35px
+            75px
+            75px
+            45px
+            1fr;
+    }
+
+    .day input{
+        font-size:13px;
+        padding:3px;
+    }
+}
 </style>
 </head>
-
 <body>
 
 <div class="container">
 
-<h1>Work Planner Pro</h1>
+    <div class="top-bar">
+        <h1>Work Hours Planner</h1>
+        <div class="menu-wrapper">
+            <button id="menuToggle" class="menu-button" type="button" aria-label="Open menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
 
-<input type="week" id="weekPicker">
+            <div id="menuPanel" class="menu-panel hidden" aria-hidden="true">
+                <button class="menu-item" type="button" id="menuFillWorkday">Fill Mon–Fri</button>
+                <button class="menu-item" type="button" id="menuClockToday">Clock In/Out</button>
+                <button class="menu-item" type="button" id="menuGoCurrentWeek">Go to current week</button>
+            </div>
+        </div>
+    </div>
 
-<div id="daysContainer"></div>
+    <div class="week-controls">
+        <button id="prevWeek" class="nav-button" type="button">←</button>
+        <input type="week"
+               id="weekPicker"
+               class="week-picker">
+        <button id="nextWeek" class="nav-button" type="button">→</button>
+    </div>
 
-<div class="total">
-    Weekly Total: <span id="weeklyTotal">0.00</span> hrs
-</div>
+    <div id="weeklySummary" class="summary">
+        <span id="weeklyTotal">0.00</span> logged,
+        <span id="weeklyRemaining">40.00</span> remaining
+    </div>
+
+    <div class="header-row">
+        <div>Day</div>
+        <div>Start</div>
+        <div>Finish</div>
+        <div>Brk</div>
+        <div>Total</div>
+    </div>
+
+    <div id="daysContainer"></div>
+
+    <button id="clockButton" class="fill-button" type="button">
+        Clock In/Out for Today
+    </button>
+
+    <div id="notesModal" class="modal-overlay hidden">
+        <div class="modal">
+            <h2 id="modalTitle">Notes</h2>
+            <textarea id="modalNotes"></textarea>
+            <div class="modal-buttons">
+                <button class="cancel" type="button" id="cancelNote">Cancel</button>
+                <button class="save" type="button" id="saveNote">Save</button>
+            </div>
+        </div>
+    </div>
 
 </div>
 
 <script>
-// --- YOUR EXISTING APP LOGIC GOES HERE ---
-// (use the full JS from previous message unchanged)
-</script>
 
-<script>
-/* =========================
-   PWA REGISTRATION
-========================= */
+const dayNames = [
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat",
+    "Sun"
+];
 
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js')
-            .then(reg => console.log('SW registered'))
-            .catch(err => console.log('SW failed', err));
+const weekPicker = document.getElementById("weekPicker");
+const daysContainer = document.getElementById("daysContainer");
+const weeklyTotal = document.getElementById("weeklyTotal");
+const weeklyRemaining = document.getElementById("weeklyRemaining");
+const weeklySummary = document.getElementById("weeklySummary");
+const clockButton = document.getElementById("clockButton");
+const prevWeekButton = document.getElementById("prevWeek");
+const nextWeekButton = document.getElementById("nextWeek");
+const weekControls = document.querySelector(".week-controls");
+const menuToggle = document.getElementById("menuToggle");
+const menuPanel = document.getElementById("menuPanel");
+const menuFillWorkday = document.getElementById("menuFillWorkday");
+const menuClockToday = document.getElementById("menuClockToday");
+const menuGoCurrentWeek = document.getElementById("menuGoCurrentWeek");
+const notesModal = document.getElementById("notesModal");
+const modalTitle = document.getElementById("modalTitle");
+const modalNotes = document.getElementById("modalNotes");
+const cancelNote = document.getElementById("cancelNote");
+const saveNote = document.getElementById("saveNote");
+const targetHours = 40;
+let weekData = {};
+let activeNoteDay = null;
+
+function getCurrentDayName() {
+    const weekday = new Date().getDay();
+    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][weekday];
+}
+
+function isCurrentWeekSelected() {
+    return weekPicker.value === getCurrentWeek();
+}
+
+function getNowTime() {
+    const now = new Date();
+    return now.toTimeString().slice(0, 5);
+}
+
+function formatMinutes(totalMinutes) {
+    totalMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function roundTimeUpToQuarter(time) {
+    const [hours, minutes] = time.split(':').map(Number);
+    const total = hours * 60 + minutes;
+    const rounded = Math.ceil(total / 15) * 15;
+    return formatMinutes(rounded);
+}
+
+function roundTimeDownToQuarter(time) {
+    const [hours, minutes] = time.split(':').map(Number);
+    const total = hours * 60 + minutes;
+    const rounded = Math.floor(total / 15) * 15;
+    return formatMinutes(rounded);
+}
+
+function updateCurrentWeekButton() {
+    const current = isCurrentWeekSelected();
+    weekControls.classList.toggle("current-week", current);
+}
+
+function getIsoWeekNumber(date) {
+    const tmp = new Date(date.valueOf());
+    tmp.setHours(0, 0, 0, 0);
+    tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
+    const yearStart = new Date(tmp.getFullYear(), 0, 1);
+    return Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
+}
+
+function getWeeksInYear(year) {
+    return getIsoWeekNumber(new Date(year, 11, 31));
+}
+
+function changeWeek(offset) {
+    const [year, weekPart] = weekPicker.value.split("-W");
+    let y = Number(year);
+    let w = Number(weekPart);
+
+    w += offset;
+    const maxWeeks = getWeeksInYear(y);
+
+    if (w < 1) {
+        y -= 1;
+        w = getWeeksInYear(y);
+    } else if (w > maxWeeks) {
+        y += 1;
+        w = 1;
+    }
+
+    weekPicker.value = `${y}-W${String(w).padStart(2, '0')}`;
+    loadWeek();
+}
+
+function fillCurrentDayTime() {
+    if (!isCurrentWeekSelected()) {
+        window.alert("Clock In/Out works only when the current week is selected.");
+        return;
+    }
+
+    const day = getCurrentDayName();
+    const startInput = document.querySelector(`[data-day="${day}"][data-field="start"]`);
+    const finishInput = document.querySelector(`[data-day="${day}"][data-field="finish"]`);
+
+    if (!startInput || !finishInput) {
+        window.alert("Unable to find fields for today in the current view.");
+        return;
+    }
+
+    const time = getNowTime();
+
+    if (!startInput.value) {
+        startInput.value = roundTimeUpToQuarter(time);
+    } else if (!finishInput.value) {
+        finishInput.value = roundTimeDownToQuarter(time);
+    } else {
+        window.alert("Today already has both start and finish times set.");
+        return;
+    }
+
+    saveWeek();
+    calculateAll();
+}
+
+function fillDefaultWorkweek() {
+    const defaultValues = {
+        start: "08:00",
+        finish: "17:00",
+        break: "30"
+    };
+
+    const existingValues = ["Mon", "Tue", "Wed", "Thu", "Fri"].some(day => {
+        return ["start", "finish", "break"].some(field => {
+            const input = document.querySelector(`[data-day="${day}"][data-field="${field}"]`);
+            return input && input.value;
+        });
+    });
+
+    if (existingValues) {
+        const shouldOverwrite = window.confirm(
+            "Some weekday values already exist. Overwrite existing Monday–Friday data with 8:00–17:00 and 30-minute breaks?"
+        );
+
+        if (!shouldOverwrite) {
+            return;
+        }
+    }
+
+    ["Mon", "Tue", "Wed", "Thu", "Fri"].forEach(day => {
+        document.querySelector(`[data-day="${day}"][data-field="start"]`).value = defaultValues.start;
+        document.querySelector(`[data-day="${day}"][data-field="finish"]`).value = defaultValues.finish;
+        document.querySelector(`[data-day="${day}"][data-field="break"]`).value = defaultValues.break;
+    });
+
+    saveWeek();
+    calculateAll();
+}
+
+function getCurrentWeek() {
+
+    const date = new Date();
+
+    const target = new Date(date.valueOf());
+
+    const dayNr = (date.getDay() + 6) % 7;
+
+    target.setDate(target.getDate() - dayNr + 3);
+
+    const firstThursday = target.valueOf();
+
+    target.setMonth(0, 1);
+
+    if (target.getDay() !== 4) {
+        target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+    }
+
+    const weekNumber =
+        1 + Math.ceil((firstThursday - target) / 604800000);
+
+    return `${date.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
+}
+
+weekPicker.value = getCurrentWeek();
+
+function getStorageKey() {
+    return `workhours_${weekPicker.value}`;
+}
+
+function loadWeek() {
+
+    const data = JSON.parse(
+        localStorage.getItem(getStorageKey()) || "{}"
+    );
+
+    weekData = data;
+    daysContainer.innerHTML = "";
+
+    const currentDay = getCurrentDayName();
+    const highlightCurrentWeek = isCurrentWeekSelected();
+
+    dayNames.forEach(day => {
+
+        const dayData = weekData[day] || {
+            start: "",
+            finish: "",
+            break: 30,
+            notes: ""
+        };
+
+        const row = document.createElement("div");
+
+        row.className = "day";
+        if (dayData.notes) {
+            row.classList.add("has-note");
+        }
+        if (highlightCurrentWeek && day === currentDay) {
+            row.classList.add("today-row");
+        }
+
+        row.innerHTML = `
+            <div class="day-name">${day}</div>
+
+            <input type="time"
+                   value="${dayData.start || ""}"
+                   data-day="${day}"
+                   data-field="start">
+
+            <input type="time"
+                   value="${dayData.finish || ""}"
+                   data-day="${day}"
+                   data-field="finish">
+
+            <input type="number"
+                   min="0"
+                   value="${dayData.break ?? 30}"
+                   data-day="${day}"
+                   data-field="break">
+
+            <div class="hours">
+                <span id="hours-${day}">0.00</span>h
+            </div>
+        `;
+
+        daysContainer.appendChild(row);
+    });
+
+    attachEvents();
+    calculateAll();
+    updateCurrentWeekButton();
+}
+
+clockButton.addEventListener("click", fillCurrentDayTime);
+prevWeekButton.addEventListener("click", () => changeWeek(-1));
+nextWeekButton.addEventListener("click", () => changeWeek(1));
+menuToggle.addEventListener("click", () => {
+    menuPanel.classList.toggle("hidden");
+    menuPanel.setAttribute("aria-hidden", menuPanel.classList.contains("hidden") ? "true" : "false");
+});
+menuFillWorkday.addEventListener("click", () => {
+    fillDefaultWorkweek();
+    closeMenu();
+});
+menuClockToday.addEventListener("click", () => {
+    fillCurrentDayTime();
+    closeMenu();
+});
+menuGoCurrentWeek.addEventListener("click", () => {
+    weekPicker.value = getCurrentWeek();
+    loadWeek();
+    closeMenu();
+});
+document.addEventListener("click", event => {
+    if (!menuPanel.contains(event.target) && !menuToggle.contains(event.target)) {
+        closeMenu();
+    }
+});
+function closeMenu() {
+    menuPanel.classList.add("hidden");
+    menuPanel.setAttribute("aria-hidden", "true");
+}
+
+function saveWeek() {
+
+    const data = {};
+
+    document.querySelectorAll("[data-day][data-field]").forEach(input => {
+
+        const day = input.dataset.day;
+        const field = input.dataset.field;
+
+        if (!data[day]) {
+            data[day] = {};
+        }
+
+        data[day][field] = input.value;
+    });
+
+    Object.keys(weekData).forEach(day => {
+        if (!data[day]) {
+            data[day] = {};
+        }
+        if (weekData[day].notes) {
+            data[day].notes = weekData[day].notes;
+        }
+    });
+
+    localStorage.setItem(
+        getStorageKey(),
+        JSON.stringify(data)
+    );
+}
+
+function calculateDay(day) {
+
+    const start = document.querySelector(
+        `[data-day="${day}"][data-field="start"]`
+    ).value;
+
+    const finish = document.querySelector(
+        `[data-day="${day}"][data-field="finish"]`
+    ).value;
+
+    const breakMins = parseFloat(
+        document.querySelector(
+            `[data-day="${day}"][data-field="break"]`
+        ).value || 0
+    );
+
+    let hours = 0;
+
+    if (start && finish) {
+
+        const startDate = new Date(`2000-01-01T${start}`);
+        const finishDate = new Date(`2000-01-01T${finish}`);
+
+        hours = (finishDate - startDate) / 3600000;
+
+        hours -= breakMins / 60;
+
+        if (hours < 0) {
+            hours = 0;
+        }
+    }
+
+    document.getElementById(
+        `hours-${day}`
+    ).textContent = hours.toFixed(2);
+
+    return hours;
+}
+
+function calculateAll() {
+
+    let total = 0;
+
+    dayNames.forEach(day => {
+        total += calculateDay(day);
+    });
+
+    weeklyTotal.textContent = total.toFixed(2);
+
+    const remaining = Math.max(0, targetHours - total);
+    weeklyRemaining.textContent = remaining.toFixed(2);
+    weeklySummary.classList.toggle("met-target", total >= targetHours);
+}
+
+function attachEvents() {
+
+    document.querySelectorAll("[data-day][data-field]").forEach(input => {
+
+        input.addEventListener("input", () => {
+
+            saveWeek();
+            calculateAll();
+
+        });
+
+    });
+
+    document.querySelectorAll(".day").forEach(row => {
+        row.addEventListener("click", event => {
+            if (event.target.closest("input")) {
+                return;
+            }
+            const day = row.querySelector("[data-day]").dataset.day;
+            openNotesModal(day);
+        });
     });
 }
 
-/* Optional install prompt */
-let deferredPrompt;
+function openNotesModal(day) {
+    activeNoteDay = day;
+    const dayData = weekData[day] || { notes: "" };
+    modalTitle.textContent = `Notes for ${day}`;
+    modalNotes.value = dayData.notes || "";
+    notesModal.classList.remove("hidden");
+    modalNotes.focus();
+}
 
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
+function closeNotesModal() {
+    notesModal.classList.add("hidden");
+    activeNoteDay = null;
+}
 
-    // You could show a custom install button here if you want
-    console.log("Install prompt ready");
+cancelNote.addEventListener("click", closeNotesModal);
+notesModal.addEventListener("click", event => {
+    if (event.target === notesModal) {
+        closeNotesModal();
+    }
 });
+
+saveNote.addEventListener("click", () => {
+    if (!activeNoteDay) {
+        return;
+    }
+
+    if (!weekData[activeNoteDay]) {
+        weekData[activeNoteDay] = { start: "", finish: "", break: 30, notes: "" };
+    }
+
+    weekData[activeNoteDay].notes = modalNotes.value;
+    updateNoteRowState(activeNoteDay);
+    saveWeek();
+    closeNotesModal();
+});
+
+function updateNoteRowState(day) {
+    const input = document.querySelector(`.day input[data-day='${day}']`);
+    if (!input) {
+        return;
+    }
+    const row = input.closest('.day');
+    if (!row) {
+        return;
+    }
+    if (weekData[day] && weekData[day].notes) {
+        row.classList.add("has-note");
+    } else {
+        row.classList.remove("has-note");
+    }
+}
+
+weekPicker.addEventListener("change", loadWeek);
+
+loadWeek();
+
 </script>
 
 </body>
