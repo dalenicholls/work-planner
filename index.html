@@ -344,8 +344,9 @@ h1{
     </div>
 
     <div id="weeklySummary" class="summary">
-        <span id="weeklyTotal">0.00</span> logged,
-        <span id="weeklyRemaining">40.00</span> remaining
+        <div><span id="weeklyTotal">0.00</span> planned,</div>
+        <div><span id="weeklyLogged">0.00</span> logged,</div>
+        <div><span id="weeklyRemaining">40.00</span> remaining</div>
     </div>
 
     <div class="header-row">
@@ -748,6 +749,10 @@ function calculateAll() {
     });
 
     weeklyTotal.textContent = total.toFixed(2);
+    const weeklyLogged = document.getElementById("weeklyLogged");
+    if (weeklyLogged) {
+        weeklyLogged.textContent = total.toFixed(2);
+    }
 
     const remaining = Math.max(0, targetHours - total);
     weeklyRemaining.textContent = remaining.toFixed(2);
