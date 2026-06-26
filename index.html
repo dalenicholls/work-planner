@@ -150,7 +150,8 @@ h1{
         70px
         70px
         50px
-        1fr;
+        1fr
+        80px;
     gap:4px;
     padding:0 6px 6px;
     font-size:12px;
@@ -165,7 +166,8 @@ h1{
         70px
         70px
         50px
-        1fr;
+        1fr
+        80px;
 
     gap:4px;
     align-items:center;
@@ -212,6 +214,29 @@ h1{
     white-space:nowrap;
     font-size:14px;
 }
+
+.logged-day{
+    text-align:right;
+    font-weight:bold;
+    font-size:14px;
+    color:#2b8cff;
+    white-space:nowrap;
+}
+
+.entries-container{margin:6px 0 12px;display:flex;flex-direction:column;gap:6px}
+.entry{display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap}
+.entry input[type="text"]{flex:1 1 150px;min-width:120px;padding:6px 8px;border:1px solid #ccc;border-radius:6px;font-size:13px}
+.entry input[type="time"]{width:90px;padding:6px 8px;border:1px solid #ccc;border-radius:6px;font-size:13px}
+.entry input[type="number"]{width:70px;padding:6px 8px;border:1px solid #ccc;border-radius:6px;font-size:13px}
+.entry .entry-time{color:#444;margin-left:6px;white-space:nowrap}
+.entry button{padding:6px 8px;font-size:12px;border-radius:6px}
+.logged-total{font-size:13px;color:#333;text-align:right}
+
+.day-block{margin-bottom:6px}
+.day-details{display:none;padding:8px 12px;border-left:2px solid #f0f0f0;background:#fafafa;margin:6px 0;border-radius:8px}
+.day-details.expanded{display:block}
+.expand-btn{border:none;background:transparent;font-size:12px;margin-right:8px;cursor:pointer}
+.day-notes{width:100%;min-height:64px;padding:8px;border-radius:8px;border:1px solid #e6e6e6;font-size:14px}
 
 .summary {
     margin:12px 0 18px;
@@ -304,7 +329,8 @@ h1{
             75px
             75px
             45px
-            1fr;
+            1fr
+            80px;
     }
 
     .day input{
@@ -330,6 +356,7 @@ h1{
             <div id="menuPanel" class="menu-panel hidden" aria-hidden="true">
                 <button class="menu-item" type="button" id="menuFillWorkday">Fill Mon–Fri</button>
                 <button class="menu-item" type="button" id="menuClockToday">Clock In/Out</button>
+                <button class="menu-item" type="button" id="menuNewTimeEntry">New Time Entry</button>
                 <button class="menu-item" type="button" id="menuGoCurrentWeek">Go to current week</button>
             </div>
         </div>
@@ -355,6 +382,7 @@ h1{
         <div>Finish</div>
         <div>Brk</div>
         <div>Total</div>
+        <div>Logged</div>
     </div>
 
     <div id="daysContainer"></div>
@@ -407,9 +435,11 @@ const modalTitle = document.getElementById("modalTitle");
 const modalNotes = document.getElementById("modalNotes");
 const cancelNote = document.getElementById("cancelNote");
 const saveNote = document.getElementById("saveNote");
+const menuNewTimeEntry = document.getElementById("menuNewTimeEntry");
 const targetHours = 40;
 let weekData = {};
 let activeNoteDay = null;
+let expandedDays = new Set();
 
 function getCurrentDayName() {
     const weekday = new Date().getDay();
@@ -595,8 +625,25 @@ function loadWeek() {
             start: "",
             finish: "",
             break: 30,
-            notes: ""
+            notes: "",
+            entries: []
         };
+
+        // ensure compatibility with older saved data: always provide an entries array
+        if (!dayData.entries) {
+            dayData.entries = [];
+        }
+
+        // reflect normalized object back into weekData so later saves include entries
+        if (!weekData[day]) {
+            weekData[day] = dayData;
+        } else {
+            weekData[day].entries = weekData[day].entries || dayData.entries;
+        }
+        weekData[day].entries = (weekData[day].entries || []).map(entry => ({
+            ...entry,
+            break: entry.break != null ? Number(entry.break) : 0
+        }));
 
         const row = document.createElement("div");
 
@@ -609,7 +656,7 @@ function loadWeek() {
         }
 
         row.innerHTML = `
-            <div class="day-name">${day}</div>
+            <div class="day-name"><button class="expand-btn" type="button" aria-expanded="false">▸</button><span class="day-label">${day}</span></div>
 
             <input type="time"
                    value="${dayData.start || ""}"
@@ -630,9 +677,93 @@ function loadWeek() {
             <div class="hours">
                 <span id="hours-${day}">0.00</span>h
             </div>
+            <div class="logged-day">
+                <span id="logged-${day}">0.00</span>h
+            </div>
         `;
 
-        daysContainer.appendChild(row);
+        // wrap row and details so details can be collapsed independently
+        const dayBlock = document.createElement('div');
+        dayBlock.className = 'day-block';
+        dayBlock.appendChild(row);
+
+        const details = document.createElement('div');
+        details.className = 'day-details';
+        if (expandedDays.has(day)) {
+            details.classList.add('expanded');
+            // reflect expanded state on button
+            row.querySelector('.expand-btn').setAttribute('aria-expanded', 'true');
+            row.querySelector('.expand-btn').textContent = '▾';
+        }
+
+        // Inline notes area inside details
+        const notesArea = document.createElement('textarea');
+        notesArea.className = 'day-notes';
+        notesArea.placeholder = 'Notes';
+        notesArea.value = dayData.notes || '';
+        notesArea.addEventListener('input', () => {
+            weekData[day].notes = notesArea.value;
+            updateNoteRowState(day);
+            saveWeek();
+        });
+        details.appendChild(notesArea);
+
+        // Add 'Add Time Entry' button inside details
+        const addEntryBtn = document.createElement("button");
+        addEntryBtn.type = "button";
+        addEntryBtn.className = "fill-button";
+        addEntryBtn.style.marginTop = "6px";
+        addEntryBtn.style.marginBottom = "8px";
+        addEntryBtn.textContent = "Add Time Entry";
+        addEntryBtn.dataset.day = day;
+        addEntryBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            addEntryRow(day);
+        });
+
+        // entries container inside details
+        const entriesDiv = document.createElement('div');
+        entriesDiv.id = `entries-${day}`;
+        entriesDiv.className = 'entries-container';
+
+        details.appendChild(addEntryBtn);
+        details.appendChild(entriesDiv);
+        dayBlock.appendChild(details);
+
+        daysContainer.appendChild(dayBlock);
+
+        // expansion toggle helper
+        const toggleDetails = () => {
+            const isExpanded = expandedDays.has(day);
+            if (isExpanded) {
+                expandedDays.delete(day);
+                details.classList.remove('expanded');
+                expandBtn.setAttribute('aria-expanded', 'false');
+                expandBtn.textContent = '▸';
+            } else {
+                expandedDays.add(day);
+                details.classList.add('expanded');
+                expandBtn.setAttribute('aria-expanded', 'true');
+                expandBtn.textContent = '▾';
+            }
+        };
+
+        // wire row click to toggle expansion, except on controls
+        const expandBtn = row.querySelector('.expand-btn');
+        row.addEventListener('click', event => {
+            if (event.target.closest('input, button, textarea')) {
+                return;
+            }
+            toggleDetails();
+        });
+
+        expandBtn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            toggleDetails();
+        });
+
+        // render entries into the entries container
+        renderEntries(day);
     });
 
     attachEvents();
@@ -653,6 +784,11 @@ menuFillWorkday.addEventListener("click", () => {
 });
 menuClockToday.addEventListener("click", () => {
     fillCurrentDayTime();
+    closeMenu();
+});
+menuNewTimeEntry && menuNewTimeEntry.addEventListener("click", () => {
+    const day = getCurrentDayName();
+    addEntryRow(day);
     closeMenu();
 });
 menuGoCurrentWeek.addEventListener("click", () => {
@@ -690,9 +826,9 @@ function saveWeek() {
         if (!data[day]) {
             data[day] = {};
         }
-        if (weekData[day].notes) {
-            data[day].notes = weekData[day].notes;
-        }
+        // preserve notes and include entries (entries may be an empty array)
+        data[day].notes = weekData[day].notes || "";
+        data[day].entries = weekData[day].entries || [];
     });
 
     localStorage.setItem(
@@ -749,9 +885,19 @@ function calculateAll() {
     });
 
     weeklyTotal.textContent = total.toFixed(2);
-    const weeklyLogged = document.getElementById("weeklyLogged");
-    if (weeklyLogged) {
-        weeklyLogged.textContent = total.toFixed(2);
+    // compute logged hours from entries (separate from planned hours)
+    const weeklyLoggedEl = document.getElementById("weeklyLogged");
+    let weeklyLoggedTotal = 0;
+    dayNames.forEach(day => {
+        const entries = (weekData[day] && weekData[day].entries) ? weekData[day].entries : [];
+        if (entries && entries.length) {
+            entries.forEach(e => {
+                weeklyLoggedTotal += calculateDurationHours(e.start, e.finish, e.break);
+            });
+        }
+    });
+    if (weeklyLoggedEl) {
+        weeklyLoggedEl.textContent = weeklyLoggedTotal.toFixed(2);
     }
 
     const remaining = Math.max(0, targetHours - total);
@@ -772,15 +918,6 @@ function attachEvents() {
 
     });
 
-    document.querySelectorAll(".day").forEach(row => {
-        row.addEventListener("click", event => {
-            if (event.target.closest("input")) {
-                return;
-            }
-            const day = row.querySelector("[data-day]").dataset.day;
-            openNotesModal(day);
-        });
-    });
 }
 
 function openNotesModal(day) {
@@ -804,13 +941,54 @@ notesModal.addEventListener("click", event => {
     }
 });
 
+function addEntryRow(day) {
+    if (!weekData[day]) {
+        weekData[day] = { start: "", finish: "", break: 30, notes: "", entries: [] };
+    }
+    weekData[day].entries = weekData[day].entries || [];
+    const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    weekData[day].entries.push({
+        id,
+        project: "",
+        start: "",
+        finish: "",
+        notes: "",
+        break: 0
+    });
+
+    expandedDays.add(day);
+    const dayBlock = Array.from(document.querySelectorAll('.day-block')).find(block => {
+        const label = block.querySelector('.day-label');
+        return label && label.textContent === day;
+    });
+    if (dayBlock) {
+        const details = dayBlock.querySelector('.day-details');
+        const expandBtn = dayBlock.querySelector('.expand-btn');
+        if (details) {
+            details.classList.add('expanded');
+        }
+        if (expandBtn) {
+            expandBtn.setAttribute('aria-expanded', 'true');
+            expandBtn.textContent = '▾';
+        }
+    }
+
+    saveWeek();
+    renderEntries(day);
+    calculateAll();
+
+    const container = document.getElementById(`entries-${day}`);
+    const lastRow = container?.querySelector('.entry:last-child input[type="text"]');
+    lastRow?.focus();
+}
+
 saveNote.addEventListener("click", () => {
     if (!activeNoteDay) {
         return;
     }
 
     if (!weekData[activeNoteDay]) {
-        weekData[activeNoteDay] = { start: "", finish: "", break: 30, notes: "" };
+        weekData[activeNoteDay] = { start: "", finish: "", break: 30, notes: "", entries: [] };
     }
 
     weekData[activeNoteDay].notes = modalNotes.value;
@@ -833,6 +1011,163 @@ function updateNoteRowState(day) {
     } else {
         row.classList.remove("has-note");
     }
+}
+
+function calculateDurationHours(start, finish, breakMinutes = 0) {
+    if (!start || !finish) return 0;
+    const [sh, sm] = start.split(":").map(Number);
+    const [fh, fm] = finish.split(":").map(Number);
+    const startMin = sh * 60 + sm;
+    const finishMin = fh * 60 + fm;
+    let diff = finishMin - startMin;
+    if (diff < 0) diff = 0;
+    const effectiveMinutes = Math.max(0, diff - (Number(breakMinutes) || 0));
+    return +(effectiveMinutes / 60).toFixed(2);
+}
+
+function renderEntries(day) {
+    const container = document.getElementById(`entries-${day}`);
+    if (!container) return;
+    container.innerHTML = '';
+    const entries = (weekData[day] && weekData[day].entries) ? weekData[day].entries : [];
+
+    // sort by start time (empty last)
+    const sorted = (entries || []).slice().sort((a,b) => {
+        const sa = a.start || '';
+        const sb = b.start || '';
+        if (!sa && !sb) return 0;
+        if (!sa) return 1;
+        if (!sb) return -1;
+        return sa.localeCompare(sb);
+    });
+
+    const dayTotal = sorted.reduce((acc, e) => acc + calculateDurationHours(e.start, e.finish, e.break), 0);
+    const dailyLoggedRow = document.getElementById(`logged-${day}`);
+    if (dailyLoggedRow) {
+        dailyLoggedRow.textContent = `${dayTotal.toFixed(2)}h`;
+    }
+
+    if (!sorted.length) {
+        let totalEl = document.getElementById(`loggedTotal-${day}`);
+        if (!totalEl) {
+            totalEl = document.createElement('div');
+            totalEl.id = `loggedTotal-${day}`;
+            totalEl.className = 'logged-total';
+            container.appendChild(totalEl);
+        }
+        totalEl.textContent = `Logged: ${dayTotal.toFixed(2)}h`;
+        return;
+    }
+
+    sorted.forEach(entry => {
+        const row = document.createElement('div');
+        row.className = 'entry';
+
+        const projectInput = document.createElement('input');
+        projectInput.type = 'text';
+        projectInput.value = entry.project || '';
+        projectInput.placeholder = 'Project';
+        projectInput.addEventListener('input', () => {
+            entry.project = projectInput.value;
+            saveWeek();
+        });
+
+        const startInput = document.createElement('input');
+        startInput.type = 'time';
+        startInput.value = entry.start || '';
+        startInput.addEventListener('change', () => {
+            entry.start = startInput.value;
+            saveWeek();
+            const newDuration = calculateDurationHours(entry.start, entry.finish, entry.break);
+            durationEl.textContent = `${newDuration.toFixed(2)}h`;
+            const updatedDayTotal = sorted.reduce((acc, e) => acc + calculateDurationHours(e.start, e.finish, e.break), 0);
+            if (dailyLoggedRow) {
+                dailyLoggedRow.textContent = `${updatedDayTotal.toFixed(2)}h`;
+            }
+            const totalEl = document.getElementById(`loggedTotal-${day}`);
+            if (totalEl) {
+                totalEl.textContent = `Logged: ${updatedDayTotal.toFixed(2)}h`;
+            }
+            calculateAll();
+        });
+
+        const finishInput = document.createElement('input');
+        finishInput.type = 'time';
+        finishInput.value = entry.finish || '';
+        finishInput.addEventListener('change', () => {
+            entry.finish = finishInput.value;
+            saveWeek();
+            const newDuration = calculateDurationHours(entry.start, entry.finish, entry.break);
+            durationEl.textContent = `${newDuration.toFixed(2)}h`;
+            const updatedDayTotal = sorted.reduce((acc, e) => acc + calculateDurationHours(e.start, e.finish, e.break), 0);
+            if (dailyLoggedRow) {
+                dailyLoggedRow.textContent = `${updatedDayTotal.toFixed(2)}h`;
+            }
+            const totalEl = document.getElementById(`loggedTotal-${day}`);
+            if (totalEl) {
+                totalEl.textContent = `Logged: ${updatedDayTotal.toFixed(2)}h`;
+            }
+            calculateAll();
+        });
+
+        const breakInput = document.createElement('input');
+        breakInput.type = 'number';
+        breakInput.min = '0';
+        breakInput.step = '5';
+        breakInput.value = entry.break != null ? entry.break : 0;
+        breakInput.title = 'Break minutes';
+        breakInput.style.width = '70px';
+        breakInput.addEventListener('change', () => {
+            entry.break = Number(breakInput.value) || 0;
+            saveWeek();
+            const newDuration = calculateDurationHours(entry.start, entry.finish, entry.break);
+            durationEl.textContent = `${newDuration.toFixed(2)}h`;
+            const updatedDayTotal = sorted.reduce((acc, e) => acc + calculateDurationHours(e.start, e.finish, e.break), 0);
+            if (dailyLoggedRow) {
+                dailyLoggedRow.textContent = `${updatedDayTotal.toFixed(2)}h`;
+            }
+            const totalEl = document.getElementById(`loggedTotal-${day}`);
+            if (totalEl) {
+                totalEl.textContent = `Logged: ${updatedDayTotal.toFixed(2)}h`;
+            }
+            calculateAll();
+        });
+
+        const durationEl = document.createElement('div');
+        durationEl.className = 'entry-time';
+        const duration = calculateDurationHours(entry.start, entry.finish, entry.break);
+        durationEl.textContent = `${duration.toFixed(2)}h`;
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => {
+            const idx = weekData[day].entries.findIndex(e => e.id === entry.id);
+            if (idx !== -1) {
+                weekData[day].entries.splice(idx, 1);
+                saveWeek();
+                renderEntries(day);
+                calculateAll();
+            }
+        });
+
+        row.appendChild(projectInput);
+        row.appendChild(startInput);
+        row.appendChild(finishInput);
+        row.appendChild(breakInput);
+        row.appendChild(durationEl);
+        row.appendChild(delBtn);
+        container.appendChild(row);
+    });
+
+    let totalEl = document.getElementById(`loggedTotal-${day}`);
+    if (!totalEl) {
+        totalEl = document.createElement('div');
+        totalEl.id = `loggedTotal-${day}`;
+        totalEl.className = 'logged-total';
+        container.appendChild(totalEl);
+    }
+    totalEl.textContent = `Logged: ${dayTotal.toFixed(2)}h`;
 }
 
 weekPicker.addEventListener("change", loadWeek);
