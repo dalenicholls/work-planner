@@ -320,6 +320,25 @@ h1{
     color:#333;
 }
 
+    .modal p{
+        margin:0 0 12px;
+        line-height:1.5;
+    }
+
+    .import-options{
+        display:flex;
+        flex-direction:column;
+        gap:8px;
+        margin:12px 0 8px;
+    }
+
+    .import-option{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        font-size:14px;
+    }
+
 @media (max-width:420px){
 
     .header-row,
@@ -402,9 +421,31 @@ h1{
         </div>
     </div>
 
+    <div id="importModal" class="modal-overlay hidden">
+        <div class="modal">
+            <h2 id="importModalTitle">Import Week</h2>
+            <p id="importModalMessage"></p>
+            <div class="import-options">
+                <label class="import-option">
+                    <input type="radio" name="importMode" value="replace" checked>
+                    <span>Replace existing week</span>
+                </label>
+                <label class="import-option">
+                    <input type="radio" name="importMode" value="merge">
+                    <span>Merge into existing week</span>
+                </label>
+            </div>
+            <div class="modal-buttons">
+                <button class="cancel" type="button" id="cancelImport">Cancel</button>
+                <button class="save" type="button" id="confirmImport">Import</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
-<script>
+<script type="module">
+import { decodeImportData } from "./weekTransfer.js";
 
 const dayNames = [
     "Mon",
@@ -435,11 +476,19 @@ const modalTitle = document.getElementById("modalTitle");
 const modalNotes = document.getElementById("modalNotes");
 const cancelNote = document.getElementById("cancelNote");
 const saveNote = document.getElementById("saveNote");
+const importModal = document.getElementById("importModal");
+const importModalTitle = document.getElementById("importModalTitle");
+const importModalMessage = document.getElementById("importModalMessage");
+const cancelImport = document.getElementById("cancelImport");
+const confirmImport = document.getElementById("confirmImport");
 const menuNewTimeEntry = document.getElementById("menuNewTimeEntry");
 const targetHours = 40;
 let weekData = {};
 let activeNoteDay = null;
 let expandedDays = new Set();
+let pendingImportData = null;
+let importMode = "replace";
+let importSuccessMessage = null;
 
 function getCurrentDayName() {
     const weekday = new Date().getDay();
@@ -941,6 +990,152 @@ notesModal.addEventListener("click", event => {
     }
 });
 
+function clearImportUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("import");
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+}
+
+function showImportStatus(message) {
+    if (importSuccessMessage) {
+        importSuccessMessage.remove();
+    }
+
+    importSuccessMessage = document.createElement("div");
+    importSuccessMessage.textContent = message;
+    importSuccessMessage.style.marginBottom = "12px";
+    importSuccessMessage.style.padding = "8px 10px";
+    importSuccessMessage.style.borderRadius = "8px";
+    importSuccessMessage.style.background = "#e8f5e9";
+    importSuccessMessage.style.color = "#2e7d32";
+    importSuccessMessage.style.fontSize = "14px";
+
+    const container = document.querySelector(".container");
+    if (container) {
+        container.insertBefore(importSuccessMessage, container.firstChild);
+    }
+}
+
+function openImportDialog(decodedData) {
+    if (!decodedData) {
+        return;
+    }
+
+    pendingImportData = decodedData;
+    importMode = "replace";
+    importModalTitle.textContent = "Import Week";
+    importModalMessage.innerHTML = `Week: <strong>${decodedData.week}</strong><br>This week already exists.`;
+    importModal.classList.remove("hidden");
+    document.querySelector('input[name="importMode"][value="replace"]').checked = true;
+}
+
+function closeImportDialog() {
+    importModal.classList.add("hidden");
+    pendingImportData = null;
+}
+
+function createEntrySignature(entry) {
+    return JSON.stringify({
+        project: entry?.project || "",
+        start: entry?.start || "",
+        finish: entry?.finish || "",
+        notes: entry?.notes || "",
+        break: Number(entry?.break) || 0
+    });
+}
+
+function mergeImportedEntries(existingData = {}, importedData = {}) {
+    const mergedData = {};
+    const allDays = new Set([
+        ...Object.keys(existingData || {}),
+        ...Object.keys(importedData || {})
+    ]);
+
+    allDays.forEach(day => {
+        const existingDay = existingData[day] && typeof existingData[day] === "object" && !Array.isArray(existingData[day])
+            ? existingData[day]
+            : {};
+        const importedDay = importedData[day] && typeof importedData[day] === "object" && !Array.isArray(importedData[day])
+            ? importedData[day]
+            : {};
+
+        const existingEntries = Array.isArray(existingDay.entries) ? existingDay.entries : [];
+        const importedEntries = Array.isArray(importedDay.entries) ? importedDay.entries : [];
+        const seenEntries = new Set(existingEntries.map(entry => createEntrySignature(entry)));
+        const mergedEntries = [...existingEntries];
+
+        importedEntries.forEach(entry => {
+            const signature = createEntrySignature(entry);
+            if (seenEntries.has(signature)) {
+                return;
+            }
+
+            seenEntries.add(signature);
+            mergedEntries.push(entry);
+        });
+
+        mergedData[day] = {
+            ...existingDay,
+            ...(importedDay.start && !existingDay.start ? { start: importedDay.start } : {}),
+            ...(importedDay.finish && !existingDay.finish ? { finish: importedDay.finish } : {}),
+            ...(importedDay.break != null && existingDay.break == null ? { break: importedDay.break } : {}),
+            ...(importedDay.notes && !existingDay.notes ? { notes: importedDay.notes } : {}),
+            entries: mergedEntries
+        };
+    });
+
+    return mergedData;
+}
+
+function applyImportSelection() {
+    if (!pendingImportData) {
+        return;
+    }
+
+    const targetWeek = pendingImportData.week;
+    const storageKey = `workhours_${targetWeek}`;
+
+    if (!targetWeek || !pendingImportData.version || pendingImportData.version !== 1) {
+        closeImportDialog();
+        return;
+    }
+
+    try {
+        if (importMode === "replace") {
+            localStorage.removeItem(storageKey);
+            localStorage.setItem(storageKey, JSON.stringify(pendingImportData.data || {}));
+        } else {
+            const existingStorageData = localStorage.getItem(storageKey);
+            const existingData = existingStorageData ? JSON.parse(existingStorageData) : {};
+            const mergedData = mergeImportedEntries(existingData, pendingImportData.data || {});
+            localStorage.setItem(storageKey, JSON.stringify(mergedData));
+        }
+    } catch (error) {
+        closeImportDialog();
+        return;
+    }
+
+    clearImportUrl();
+    showImportStatus("Week imported successfully.");
+    weekPicker.value = targetWeek;
+    loadWeek();
+    closeImportDialog();
+}
+
+cancelImport.addEventListener("click", closeImportDialog);
+confirmImport.addEventListener("click", applyImportSelection);
+importModal.addEventListener("click", event => {
+    if (event.target === importModal) {
+        closeImportDialog();
+    }
+});
+document.querySelectorAll('input[name="importMode"]').forEach(input => {
+    input.addEventListener("change", () => {
+        importMode = input.value;
+    });
+});
+
 function addEntryRow(day) {
     if (!weekData[day]) {
         weekData[day] = { start: "", finish: "", break: 30, notes: "", entries: [] };
@@ -1172,6 +1367,25 @@ function renderEntries(day) {
 
 weekPicker.addEventListener("change", loadWeek);
 
+function detectImportLink() {
+    const params = new URLSearchParams(window.location.search);
+    const encodedData = params.get("import");
+
+    if (!encodedData) {
+        return;
+    }
+
+    try {
+        const decodedData = decodeImportData(encodedData);
+        if (decodedData && decodedData.version === 1) {
+            openImportDialog(decodedData);
+        }
+    } catch (error) {
+        // Ignore malformed import links.
+    }
+}
+
+detectImportLink();
 loadWeek();
 
 </script>
